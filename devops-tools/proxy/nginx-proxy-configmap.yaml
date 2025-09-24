@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nexus-docker-proxy-conf
+  namespace: nexus
+data:
+  nginx.conf: |
+    events { worker_connections 1024; }
+
+    http {
+      proxy_send_timeout 120;
+      proxy_read_timeout 300;
+      proxy_buffering off;
+      keepalive_timeout 5 5;
+      tcp_nodelay on;
+      client_max_body_size 0;
+
+      server {
+        listen 80;
+
+        # Routes Docker /v2 pour docker-private
+        location ~ ^/(v1|v2)/[^/]+/?[^/]+/blobs/ {
+          if ($request_method ~* (POST|PUT|DELETE|PATCH|HEAD)) {
+            rewrite ^/(.*)$ /repository/docker-private/$1 last;
+          }
+          rewrite ^/(.*)$ /repository/docker-private/$1 last;
+        }
+
+        location ~ ^/(v1|v2)/ {
+          if ($request_method ~* (POST|PUT|DELETE|PATCH)) {
+            rewrite ^/(.*)$ /repository/docker-private/$1 last;
+          }
+          rewrite ^/(.*)$ /repository/docker-private/$1 last;
+        }
+
+        # UI Nexus
+        location / {
+          proxy_pass http://nexus-service.nexus.svc.cluster.local:8081/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto "http";
+        }
+      }
+    }

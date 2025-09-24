@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-docker-proxy
+  namespace: nexus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nexus-docker-proxy
+  template:
+    metadata:
+      labels:
+        app: nexus-docker-proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: conf
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+      volumes:
+      - name: conf
+        configMap:
+          name: nexus-docker-proxy-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus-docker-proxy
+  namespace: nexus
+spec:
+  type: LoadBalancer
+  selector:
+    app: nexus-docker-proxy
+  ports:
+    - name: http
+      port: 8082       # Port externe (celui que tu vas utiliser)
+      targetPort: 80   # Port interne du pod Nginx
+      protocol: TCP
